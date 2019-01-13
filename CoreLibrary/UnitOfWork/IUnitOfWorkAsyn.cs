@@ -7,6 +7,8 @@ namespace CoreLibrary.UnitOfWork
 {
     public interface IUnitOfWorkAsync : IUnitOfWork
     {
+        int Commit();  
+        Task<int> CommitAsync();
         Task<int> SaveChangesAsync();
         Task<int> SaveChangesAsync(CancellationToken cancellationToken);
         IRepositoryAsync<TEntity> GetRepositoryAsync<TEntity>() where TEntity : class;

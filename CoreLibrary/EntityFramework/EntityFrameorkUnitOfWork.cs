@@ -1,7 +1,10 @@
 ﻿#region
 
 using System;
+using System.Collections.Generic;
 using System.Data;
+using System.Data.Common;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using CoreLibrary.DataContext;
@@ -20,6 +23,7 @@ namespace CoreLibrary.EntityFramework
 
         private DbContext _context;
         protected readonly IServiceProvider ServiceProvider;
+        private DbTransaction _transaction;
 
         #endregion Private Fields
 
@@ -36,6 +40,13 @@ namespace CoreLibrary.EntityFramework
         {
             CheckDisposed();
             return _context.SaveChanges();
+        }
+
+        public async Task<int> CommitAsync()
+        {
+            var saveChangesAsync = SaveChangesAsync();
+            _transaction.Commit();
+            return await saveChangesAsync;
         }
 
         public Task<int> SaveChangesAsync()
@@ -136,17 +147,27 @@ namespace CoreLibrary.EntityFramework
             {
                 _context.Database.GetDbConnection().Open();
             }
-            _context.Database.BeginTransaction();
+            //_context.Database.BeginTransaction();
+            _transaction = _context.Database.GetDbConnection().BeginTransaction();
+        }
+
+        int IUnitOfWorkAsync.Commit()
+        {
+            var saveChanges = SaveChanges();
+            _transaction.Commit();
+            return saveChanges;
         }
 
         public void Commit()
         {
-            _context.Database.CommitTransaction();
+            // _context.Database.CommitTransaction(); 
+            _transaction.Commit(); 
         }
 
         public void Rollback()
         {
-            _context.Database.RollbackTransaction();
+            //_context.Database.RollbackTransaction();
+            _transaction.Rollback();
         }
 
         public void DisposeTransaction()
@@ -155,5 +176,11 @@ namespace CoreLibrary.EntityFramework
         }
 
         #endregion
+
+        public IEnumerable<TElement> SqlQuery<TElement>(string sql, params object[] parameters) where TElement : class
+            => _context.Set<TElement>().FromSql(sql, parameters).AsEnumerable();
+
+        public IEnumerable<TEntity> ExecuteStoredProcedureList<TEntity>(string commandText, params object[] parameters) where TEntity : class , new()
+            => _context.Set<TEntity>().FromSql(commandText, parameters).AsEnumerable();
     }
 }
